@@ -46,9 +46,6 @@ type SQLStorageAuthority struct {
 	dbMap         *db.WrappedMap
 	dbReadOnlyMap *db.WrappedMap
 
-	// Redis client for storing OCSP responses in Redis.
-	rocspWriteClient rocspWriter
-
 	// Short issuer map used by rocsp.
 	shortIssuers []rocsp_config.ShortIDIssuer
 
@@ -93,7 +90,6 @@ type orderFQDNSet struct {
 func NewSQLStorageAuthority(
 	dbMap *db.WrappedMap,
 	dbReadOnlyMap *db.WrappedMap,
-	rocspWriteClient rocspWriter,
 	shortIssuers []rocsp_config.ShortIDIssuer,
 	clk clock.Clock,
 	logger blog.Logger,
@@ -117,7 +113,6 @@ func NewSQLStorageAuthority(
 	ssa := &SQLStorageAuthority{
 		dbMap:                dbMap,
 		dbReadOnlyMap:        dbReadOnlyMap,
-		rocspWriteClient:     rocspWriteClient,
 		shortIssuers:         shortIssuers,
 		clk:                  clk,
 		log:                  logger,
@@ -699,6 +694,37 @@ func (ssa *SQLStorageAuthority) CountFQDNSets(ctx context.Context, req *sapb.Cou
 		ssa.clk.Now().Add(-time.Duration(req.Window)),
 	)
 	return &sapb.Count{Count: count}, err
+}
+
+// FQDNSetTimestampsForWindow returns the issuance timestamps for each
+// certificate, issued for a set of domains, during a given window of time, in
+// ascending order.
+func (ssa *SQLStorageAuthority) FQDNSetTimestampsForWindow(ctx context.Context, req *sapb.CountFQDNSetsRequest) (*sapb.Timestamps, error) {
+	if req.Window == 0 || len(req.Domains) == 0 {
+		return nil, errIncompleteRequest
+	}
+	type row struct {
+		Issued time.Time
+	}
+	var rows []row
+	_, err := ssa.dbReadOnlyMap.WithContext(ctx).Select(
+		&rows,
+		`SELECT issued FROM fqdnSets 
+		WHERE setHash = ?
+		AND issued > ?
+		ORDER BY issued ASC`,
+		HashNames(req.Domains),
+		ssa.clk.Now().Add(-time.Duration(req.Window)),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	var results []int64
+	for _, i := range rows {
+		results = append(results, i.Issued.UnixNano())
+	}
+	return &sapb.Timestamps{Timestamps: results}, nil
 }
 
 // FQDNSetExists returns a bool indicating if one or more FQDN sets |names|
@@ -1764,23 +1790,6 @@ func (ssa *SQLStorageAuthority) RevokeCertificate(ctx context.Context, req *sapb
 		return nil, berrors.AlreadyRevokedError("no certificate with serial %s and status other than %s", req.Serial, string(core.OCSPStatusRevoked))
 	}
 
-	// Store the OCSP response in Redis (if configured) on a best effort
-	// basis. We don't want to fail on an error here while mysql is the
-	// source of truth.
-	if ssa.rocspWriteClient != nil {
-		// Use a new context for the goroutine. We aren't going to wait on
-		// the goroutine to complete, so we don't want it to be canceled
-		// when the parent function ends. The rocsp client has a
-		// configurable timeout that can be set during creation.
-		rocspCtx := context.Background()
-
-		// Send the response off to redis in a goroutine.
-		go func() {
-			err = ssa.storeOCSPRedis(rocspCtx, req.Response, req.IssuerID)
-			ssa.log.Debugf("failed to store OCSP response in redis: %v", err)
-		}()
-	}
-
 	return &emptypb.Empty{}, nil
 }
 
@@ -1822,23 +1831,6 @@ func (ssa *SQLStorageAuthority) UpdateRevokedCertificate(ctx context.Context, re
 		// InternalServerError because we expected this certificate status to exist,
 		// to already be revoked for a different reason, and to have a matching date.
 		return nil, berrors.InternalServerError("no certificate with serial %s and revoked reason other than keyCompromise", req.Serial)
-	}
-
-	// Store the OCSP response in Redis (if configured) on a best effort
-	// basis. We don't want to fail on an error here while mysql is the
-	// source of truth.
-	if ssa.rocspWriteClient != nil {
-		// Use a new context for the goroutine. We aren't going to wait on
-		// the goroutine to complete, so we don't want it to be canceled
-		// when the parent function ends. The rocsp client has a
-		// configurable timeout that can be set during creation.
-		rocspCtx := context.Background()
-
-		// Send the response off to redis in a goroutine.
-		go func() {
-			err = ssa.storeOCSPRedis(rocspCtx, req.Response, req.IssuerID)
-			ssa.log.Debugf("failed to store OCSP response in redis: %v", err)
-		}()
 	}
 
 	return &emptypb.Empty{}, nil

@@ -11,6 +11,7 @@ import (
 	"github.com/jmhodges/clock"
 	"github.com/letsencrypt/boulder/cmd"
 	"github.com/letsencrypt/boulder/metrics"
+	"golang.org/x/crypto/ocsp"
 )
 
 func makeClient() (*WritingClient, clock.Clock) {
@@ -40,12 +41,16 @@ func makeClient() (*WritingClient, clock.Clock) {
 func TestSetAndGet(t *testing.T) {
 	client, _ := makeClient()
 
-	response, err := ioutil.ReadFile("testdata/ocsp.response")
+	respBytes, err := ioutil.ReadFile("testdata/ocsp.response")
 	if err != nil {
 		t.Fatal(err)
 	}
-	var shortIssuerID byte = 99
-	err = client.StoreResponse(context.Background(), response, shortIssuerID)
+
+	response, err := ocsp.ParseResponse(respBytes, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = client.StoreResponse(context.Background(), response)
 	if err != nil {
 		t.Fatalf("storing response: %s", err)
 	}
@@ -55,22 +60,7 @@ func TestSetAndGet(t *testing.T) {
 	if err != nil {
 		t.Fatalf("getting response: %s", err)
 	}
-	if !bytes.Equal(resp2, response) {
+	if !bytes.Equal(resp2, respBytes) {
 		t.Errorf("response written and response retrieved were not equal")
-	}
-
-	metadata, err := client.GetMetadata(context.Background(), serial)
-	if err != nil {
-		t.Fatalf("getting metadata: %s", err)
-	}
-	if metadata.ShortIssuerID != shortIssuerID {
-		t.Errorf("expected shortIssuerID %d, got %d", shortIssuerID, metadata.ShortIssuerID)
-	}
-	expectedTime, err := time.Parse(time.RFC3339, "2021-10-25T20:00:00Z")
-	if err != nil {
-		t.Fatalf("failed to parse time: %s", err)
-	}
-	if metadata.ThisUpdate != expectedTime {
-		t.Errorf("expected ThisUpdate %q, got %q", expectedTime, metadata.ThisUpdate)
 	}
 }
