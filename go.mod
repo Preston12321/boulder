@@ -26,7 +26,7 @@ require (
 	github.com/prometheus/client_golang v1.14.0
 	github.com/prometheus/client_model v0.3.0
 	github.com/titanous/rocacheck v0.0.0-20171023193734-afe73141d399
-	github.com/weppos/publicsuffix-go v0.30.0
+	github.com/weppos/publicsuffix-go v0.40.3-0.20240827081627-79320a6d7ec6
 	github.com/zmap/zcrypto v0.0.0-20220402174210-599ec18ecbac
 	github.com/zmap/zlint/v3 v3.4.0
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.41.0
@@ -35,14 +35,14 @@ require (
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.15.0
 	go.opentelemetry.io/otel/sdk v1.15.0
 	go.opentelemetry.io/otel/trace v1.15.0
-	golang.org/x/crypto v0.8.0
+	golang.org/x/crypto v0.26.0
 	golang.org/x/exp v0.0.0-20230321023759-10a507213a29
-	golang.org/x/net v0.9.0
-	golang.org/x/sync v0.1.0
-	golang.org/x/term v0.7.0
-	golang.org/x/text v0.9.0
+	golang.org/x/net v0.28.0
+	golang.org/x/sync v0.8.0
+	golang.org/x/term v0.23.0
+	golang.org/x/text v0.17.0
 	google.golang.org/grpc v1.54.0
-	google.golang.org/protobuf v1.30.0
+	google.golang.org/protobuf v1.33.0
 	gopkg.in/go-jose/go-jose.v2 v2.6.1
 	gopkg.in/yaml.v3 v3.0.1
 )
@@ -83,9 +83,9 @@ require (
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.15.0 // indirect
 	go.opentelemetry.io/otel/metric v0.38.0 // indirect
 	go.opentelemetry.io/proto/otlp v0.19.0 // indirect
-	golang.org/x/mod v0.10.0 // indirect
-	golang.org/x/sys v0.7.0 // indirect
-	golang.org/x/tools v0.8.0 // indirect
+	golang.org/x/mod v0.17.0 // indirect
+	golang.org/x/sys v0.23.0 // indirect
+	golang.org/x/tools v0.21.1-0.20240508182429-e35e4ccd0d2d // indirect
 	google.golang.org/genproto v0.0.0-20230410155749-daa745c078e1 // indirect
 	gopkg.in/fsnotify.v1 v1.4.7 // indirect
 	gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7 // indirect
